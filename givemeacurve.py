@@ -1,7 +1,8 @@
-from Tkinter import *
-from tkFont import *
-from tkFileDialog import *
+from tkinter import *
+from tkinter.font import *
+from tkinter.filedialog import *
 from PIL import Image, ImageTk
+import json
 
 class getdata(Frame):
 	def __init__(self, master=None, filedb=None):
@@ -62,9 +63,14 @@ class getdata(Frame):
 	def setYD(self):self.clkcondition = "dy"
 	
 	def Save(self):
+		if  self.xIleft  is None \
+		 or self.xIright is None \
+		 or self.yIup    is None \
+		 or self.yIdown  is None \
+		 or self.ImSize  is None : return
 		options ={
-			'defaultextension' : '.dat',
-			'filetypes': [('Data', '.dat')],
+			'defaultextension' : '.json',
+			'filetypes': [('json', '.json')],
 			'initialdir':".",
 			'parent': self,
 			'title':'Save to ...'
@@ -73,14 +79,28 @@ class getdata(Frame):
 		if not filename : return
 		xscale, yscale = (float(self.xDright.get()) - float(self.xDleft.get()))/float(self.xIright-self.xIleft), (float(self.yDup.get()) - float(self.yDdown.get()))/float(self.yIup-self.yIdown)
 		with open(filename, "w") as fd:
+			fdic ={}
+			fdic['xscale']  = (float(self.xDright.get()) - float(self.xDleft.get()))/float(self.xIright-self.xIleft)
+			fdic['yscale']  = (float(self.yDup.get()) - float(self.yDdown.get()))/float(self.yIup-self.yIdown)
+			fdic['image']   = self.filename
+			fdic["xDleft"]  = float(self.xDleft.get())
+			fdic["xDright"] = float(self.xDright.get())
+			fdic["yDup"]    = float(self.yDup.get())
+			fdic["yDdown"]  = float(self.yDdown.get())
+			fdic["xIleft"]  = float(self.xIleft)
+			fdic["xIright"] = float(self.xIright)
+			fdic["yIup"]    = float(self.yIup)
+			fdic["yIdown"]  = float(self.yIdown)
+			fdic["curves"]  = {}
 			for name in self.curves:
-				p = []
+				fdic["curves"][name] = []
 				for x in self.curves[name]:
 					if len(x) == 3:
-						p.append([ float(x[0]-self.xIleft)*xscale,float(x[1]-self.yIdown)*yscale,x[2]*yscale ])
+						fdic["curves"][name].append([ float(x[0]-self.xIleft)*xscale+fdic["xDleft"],float(x[1]-self.yIdown)*yscale+fdic["yDdown"],x[2]*yscale ])
 					else:
-						p.append([ float(x[0]-self.xIleft)*xscale,float(x[1]-self.yIdown)*yscale ] )
-				fd.write("\'{}\',{},{},{}\n".format(name,xscale,yscale,p))
+						fdic["curves"][name].append([ float(x[0]-self.xIleft)*xscale+fdic["xDleft"],float(x[1]-self.yIdown)*yscale+fdic["yDdown"] ] )
+			fd.write(json.dumps(fdic)+"\n")
+				
 			
 	def Load(self):
 		if  self.xIleft  is None \
@@ -89,30 +109,27 @@ class getdata(Frame):
 		 or self.yIdown  is None \
 		 or self.ImSize  is None : return
 		options ={
-			'defaultextension' : '.dat',
-			'filetypes': [('Data', '.dat')],
+			'defaultextension' : '.json',
+			'filetypes': [('json', '.json')],
 			'initialdir':".",
 			'parent': self,
-			'title':'Save to ...'
+			'title':'Load from ...'
 		}
 		filename = askopenfilename(**options)
 		if not filename : return
 		xscale, yscale = float(self.xIright-self.xIleft)/(float(self.xDright.get()) - float(self.xDleft.get())), float(self.yIup-self.yIdown)/(float(self.yDup.get()) - float(self.yDdown.get()))
+		xDleft = float( self.xDleft.get() )
+		yDdown = float( self.yDdown.get() )
+		
 		with open(filename, "r") as fd:
-			for n,l in enumerate(fd.readlines()):
-				try:
-					exec "name,sx,sy,p="+l
-				except:
-					print "skip line #",n,"   :",l
-					continue
-				self.curves[name] = []
-				for x in p:
-					if len(x) == 3:
-						self.curves[name].append( [x[0]*xscale+self.xIleft, x[1]*yscale+self.yIdown, x[2]*yscale ] )
-					else:
-						self.curves[name].append( [x[0]*xscale+self.xIleft, x[1]*yscale+self.yIdown ] )
-						
-						
+			fdic = json.loads(fd.read())
+		for name in fdic["curves"]:
+			self.curves[name] = []
+			for x in fdic["curves"][name]:
+				if len(x) == 3:
+					self.curves[name].append( [(x[0]-xDleft)*xscale+self.xIleft, (x[1]-yDdown)*yscale+self.yIdown, x[2]*yscale ] )
+				else:
+					self.curves[name].append( [(x[0]-xDleft)*xscale+self.xIleft, (x[1]-yDdown)*yscale+self.yIdown ] )
 		
 	def sartCurve(self):
 		if self.CurveName.get() == "" : return
